@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego de la Serpiente - Pears</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* Estilos personalizados para el juego */
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background-color: #2c3e50; /* Azul oscuro para el cuerpo de la página */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #ecf0f1;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .game-container {
+            background-color: #34495e; /* Un azul ligeramente más claro para el contenedor */
+            border-radius: 12px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5), 0 0 0 8px rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            text-align: center;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #f1c40f; /* Amarillo para el título */
+        }
+
+        canvas {
+            display: block;
+            background-color: #4A90E2; /* Fondo Azul como se solicitó */
+            border: 4px solid #f1c40f;
+            border-radius: 6px;
+            image-rendering: pixelated; /* Mejor para gráficos de baja resolución */
+            touch-action: none; /* Previene el scroll en dispositivos táctiles */
+        }
+
+        .info-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            font-size: 0.8rem;
+        }
+
+        .instructions {
+            margin-top: 20px;
+            font-size: 0.6rem;
+            color: #bdc3c7;
+        }
+
+        /* Estilo para el botón de control táctil (visible solo en pantallas pequeñas) */
+        .controls {
+            display: none;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .control-button {
+            background-color: #f1c40f;
+            color: #2c3e50;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.7rem;
+            box-shadow: 0 4px #c39c0f;
+            transition: all 0.1s;
+        }
+
+        .control-button:active {
+            box-shadow: 0 0 #c39c0f;
+            transform: translateY(4px);
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.3s;
+        }
+
+        .modal-content {
+            background-color: #34495e;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+        }
+
+        .modal-button {
+            background-color: #e74c3c;
+            color: white;
+            padding: 10px 20px;
+            margin-top: 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'Press Start 2P', cursive;
+            box-shadow: 0 3px #c0392b;
+        }
+        
+        .modal-button:active {
+            box-shadow: 0 0 #c0392b;
+            transform: translateY(3px);
+        }
+
+
+        /* Mostrar controles táctiles en dispositivos pequeños */
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.2rem;
+            }
+            .controls {
+                display: flex;
+                flex-wrap: wrap;
+                margin-top: 10px;
+            }
+            .control-button {
+                flex-grow: 1;
+                margin: 5px;
+            }
+            .info-panel {
+                font-size: 0.7rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <h1>🐍 Serpiente Devora Peras 🍐</h1>
+
+        <div class="info-panel">
+            <span>Puntuación: <span id="score">0</span></span>
+            <span>Velocidad: <span id="speed">10</span></span>
+        </div>
+
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+
+        <div class="controls" id="touchControls">
+            <button class="control-button" data-dir="up">ARRIBA</button>
+            <button class="control-button" data-dir="left">IZQUIERDA</button>
+            <button class="control-button" data-dir="right">DERECHA</button>
+            <button class="control-button" data-dir="down">ABAJO</button>
+        </div>
+
+        <div class="instructions">
+            <p>Usa las flechas del teclado o los botones táctiles para mover la víbora verde y comer las peras.</p>
+        </div>
+    </div>
+
+    <!-- Modal para Game Over -->
+    <div id="gameOverModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h2 style="color: #e74c3c;">¡FIN DEL JUEGO!</h2>
+            <p style="margin-bottom: 20px;">Tu puntuación final fue: <span id="finalScore" style="color: #f1c40f; font-size: 1.2rem;">0</span></p>
+            <button id="restartButton" class="modal-button">Jugar de Nuevo</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Constantes y Variables del Juego ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score');
+        const speedDisplay = document.getElementById('speed');
+        const modal = document.getElementById('gameOverModal');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const restartButton = document.getElementById('restartButton');
+        const touchControls = document.getElementById('touchControls');
+
+        const GRID_SIZE = 20; // Número de celdas en el canvas (20x20)
+        const TILE_SIZE = canvas.width / GRID_SIZE;
+        let gameLoopInterval;
+
+        let snake = {
+            x: 10,
+            y: 10,
+            dx: 1, // Dirección inicial: derecha
+            dy: 0,
+            body: [],
+            length: 4 // Longitud inicial de la serpiente
+        };
+
+        let pear = {
+            x: 0,
+            y: 0,
+        };
+
+        let score = 0;
+        let speed = 10; // Velocidad inicial (cuadros por segundo)
+        let isGameOver = false;
+
+        // --- Inicialización y Lógica Principal ---
+
+        /**
+         * Genera una posición aleatoria para la pera dentro de la cuadrícula.
+         */
+        function placePear() {
+            let newX, newY;
+            let occupied = true;
+
+            while (occupied) {
+                newX = Math.floor(Math.random() * GRID_SIZE);
+                newY = Math.floor(Math.random() * GRID_SIZE);
+
+                occupied = false;
+                // Verificar que no aparezca sobre la serpiente
+                if (newX === snake.x && newY === snake.y) {
+                    occupied = true;
+                    continue;
+                }
+                for (const segment of snake.body) {
+                    if (segment.x === newX && segment.y === newY) {
+                        occupied = true;
+                        break;
+                    }
+                }
+            }
+
+            pear.x = newX;
+            pear.y = newY;
+        }
+
+        /**
+         * Dibuja la serpiente en el canvas.
+         */
+        function drawSnake() {
+            // Dibuja el cuerpo de la serpiente (verde)
+            ctx.fillStyle = '#41CC7B'; // Verde solicitado
+            for (const segment of snake.body) {
+                ctx.fillRect(segment.x * TILE_SIZE, segment.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                // Opcional: Borde para un efecto más retro
+                ctx.strokeStyle = '#34a060';
+                ctx.strokeRect(segment.x * TILE_SIZE, segment.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            }
+
+            // Dibuja la cabeza de la serpiente (un poco más oscura para distinguirla)
+            ctx.fillStyle = '#2d8e57';
+            ctx.fillRect(snake.x * TILE_SIZE, snake.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            ctx.strokeStyle = '#206b3f';
+            ctx.strokeRect(snake.x * TILE_SIZE, snake.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        }
+
+        /**
+         * Dibuja la pera (comida) en el canvas usando un emoji.
+         */
+        function drawPear() {
+            const emoji = '🍐';
+            ctx.font = `${TILE_SIZE}px sans-serif`;
+            // Centrar el emoji lo mejor posible dentro de la celda
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(emoji, pear.x * TILE_SIZE + TILE_SIZE / 2, pear.y * TILE_SIZE + TILE_SIZE / 2);
+        }
+
+        /**
+         * Actualiza la lógica del juego (movimiento, colisiones, crecimiento).
+         */
+        function updateGame() {
+            if (isGameOver) return;
+
+            // 1. Mover la serpiente
+            const head = { x: snake.x, y: snake.y };
+            snake.body.push(head); // Añadir la cabeza actual al cuerpo
+
+            snake.x += snake.dx;
+            snake.y += snake.dy;
+
+            // Eliminar el segmento de la cola si no creció
+            while (snake.body.length > snake.length) {
+                snake.body.shift();
+            }
+
+            // 2. Comprobar colisiones
+            checkCollisions();
+
+            // 3. Comprobar si come la pera
+            if (snake.x === pear.x && snake.y === pear.y) {
+                score++;
+                snake.length++; // La serpiente crece
+                scoreDisplay.textContent = score;
+
+                // Aumentar la velocidad cada 5 puntos
+                if (score % 5 === 0) {
+                    speed++;
+                    speedDisplay.textContent = speed;
+                    clearInterval(gameLoopInterval);
+                    gameLoopInterval = setInterval(gameLoop, 1000 / speed);
+                }
+
+                placePear(); // Generar una nueva pera
+            }
+        }
+
+        /**
+         * Revisa las colisiones con las paredes y consigo misma.
+         */
+        function checkCollisions() {
+            // Colisión con la pared
+            if (snake.x < 0 || snake.x >= GRID_SIZE || snake.y < 0 || snake.y >= GRID_SIZE) {
+                gameOver();
+                return;
+            }
+
+            // Colisión consigo misma (revisar si la cabeza choca con cualquier segmento del cuerpo)
+            // Comenzar desde el final del cuerpo (los más recientes) para ser más eficiente
+            for (let i = snake.body.length - 1; i >= 0; i--) {
+                const segment = snake.body[i];
+                if (snake.x === segment.x && snake.y === segment.y) {
+                    gameOver();
+                    return;
+                }
+            }
+        }
+
+        /**
+         * Función llamada cuando el juego termina.
+         */
+        function gameOver() {
+            isGameOver = true;
+            clearInterval(gameLoopInterval);
+            finalScoreDisplay.textContent = score;
+            modal.style.display = 'flex';
+        }
+
+        /**
+         * Reinicia todas las variables del juego a su estado inicial.
+         */
+        function resetGame() {
+            snake = {
+                x: 10,
+                y: 10,
+                dx: 1,
+                dy: 0,
+                body: [],
+                length: 4
+            };
+            score = 0;
+            speed = 10;
+            isGameOver = false;
+
+            scoreDisplay.textContent = score;
+            speedDisplay.textContent = speed;
+            modal.style.display = 'none';
+
+            placePear();
+            gameLoopInterval = setInterval(gameLoop, 1000 / speed);
+        }
+
+        /**
+         * Bucle principal del juego: borra, actualiza y dibuja.
+         */
+        function gameLoop() {
+            // Borrar el canvas (fondo azul)
+            ctx.fillStyle = '#4A90E2';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            updateGame();
+
+            drawPear();
+            drawSnake();
+        }
+
+        // --- Manejo de Entrada (Teclado) ---
+
+        /**
+         * Maneja el cambio de dirección con las teclas de flecha.
+         */
+        document.addEventListener('keydown', (e) => {
+            if (isGameOver) return;
+
+            // Prevenir que la serpiente se mueva inmediatamente en la dirección opuesta (colisión instantánea)
+            switch (e.key) {
+                case 'ArrowUp':
+                    if (snake.dy === 0) { snake.dx = 0; snake.dy = -1; }
+                    break;
+                case 'ArrowDown':
+                    if (snake.dy === 0) { snake.dx = 0; snake.dy = 1; }
+                    break;
+                case 'ArrowLeft':
+                    if (snake.dx === 0) { snake.dx = -1; snake.dy = 0; }
+                    break;
+                case 'ArrowRight':
+                    if (snake.dx === 0) { snake.dx = 1; snake.dy = 0; }
+                    break;
+                case ' ': // Espacio para pausa/reinicio rápido
+                    if (isGameOver) resetGame();
+                    break;
+            }
+        });
+
+        // --- Manejo de Entrada (Táctil) ---
+
+        /**
+         * Asigna los eventos de click para los controles táctiles.
+         */
+        touchControls.addEventListener('click', (e) => {
+            const dir = e.target.dataset.dir;
+            if (!dir || isGameOver) return;
+
+            switch (dir) {
+                case 'up':
+                    if (snake.dy === 0) { snake.dx = 0; snake.dy = -1; }
+                    break;
+                case 'down':
+                    if (snake.dy === 0) { snake.dx = 0; snake.dy = 1; }
+                    break;
+                case 'left':
+                    if (snake.dx === 0) { snake.dx = -1; snake.dy = 0; }
+                    break;
+                case 'right':
+                    if (snake.dx === 0) { snake.dx = 1; snake.dy = 0; }
+                    break;
+            }
+        });
+
+
+        // --- Eventos de UI ---
+        restartButton.addEventListener('click', resetGame);
+
+        // Iniciar el juego al cargar la ventana
+        window.onload = function() {
+            resetGame();
+        };
+
+    </script>
+</body>
+</html>
